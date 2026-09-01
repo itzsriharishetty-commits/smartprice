@@ -29,13 +29,20 @@ export default function Home() {
       const response = await fetch(`/api/prices?q=${encodeURIComponent(query.trim())}`)
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || 'Could not load prices')
-      const rows = Array.isArray(payload) ? payload : payload.deals || payload.products || []
-      setLiveDeals(rows.map((row: { store?: string; retailer?: string; platform?: string; price?: string | number; amount?: string | number; note?: string }) => ({
-        store: row.store || row.retailer || row.platform || 'Quick commerce',
-        price: typeof (row.price ?? row.amount) === 'number' ? `₹${row.price ?? row.amount}` : String(row.price ?? row.amount ?? '—'),
-        note: row.note || 'Live price',
-        tone: 'lime',
-      })))
+      const groupedResults = payload?.data?.results || payload?.results || {}
+      const rows = Array.isArray(payload) ? payload : Array.isArray(groupedResults) ? groupedResults : Object.entries(groupedResults).flatMap(([store, products]) =>
+        (Array.isArray(products) ? products : []).map((product) => ({ ...(product as object), store }))
+      )
+      setLiveDeals(rows.slice(0, 12).map((row: { store?: string; retailer?: string; platform?: { name?: string } | string; price?: string | number; offer_price?: string | number; amount?: string | number; note?: string; quantity?: string; available?: boolean }) => {
+        const store = typeof row.platform === 'object' ? row.platform?.name : row.store || row.retailer || row.platform || 'Quick commerce'
+        const price = row.offer_price ?? row.price ?? row.amount
+        return {
+          store,
+          price: price == null ? '—' : `₹${price}`,
+          note: `${row.quantity || 'Live price'}${row.available === false ? ' · Out of stock' : ''}`,
+          tone: 'lime',
+        }
+      }))
       setSearched(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to fetch live prices right now.')
