@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { ArrowRight, Moon, Search, Sun } from 'lucide-react'
+import { ArrowRight, LoaderCircle, Moon, Search, Sun } from 'lucide-react'
 
 const examples = ['Atta 5kg', 'Basmati rice', 'Milk 1L', 'Maggi noodles']
 
@@ -14,11 +14,34 @@ const deals = [
 export default function Home() {
   const [query, setQuery] = useState('')
   const [searched, setSearched] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [liveDeals, setLiveDeals] = useState<typeof deals>([])
   const [dark, setDark] = useState(false)
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (query.trim()) setSearched(true)
+    if (!query.trim() || loading) return
+    setLoading(true)
+    setError('')
+    setSearched(false)
+    try {
+      const response = await fetch(`/api/prices?q=${encodeURIComponent(query.trim())}`)
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Could not load prices')
+      const rows = Array.isArray(payload) ? payload : payload.deals || payload.products || []
+      setLiveDeals(rows.map((row: { store?: string; retailer?: string; platform?: string; price?: string | number; amount?: string | number; note?: string }) => ({
+        store: row.store || row.retailer || row.platform || 'Quick commerce',
+        price: typeof (row.price ?? row.amount) === 'number' ? `₹${row.price ?? row.amount}` : String(row.price ?? row.amount ?? '—'),
+        note: row.note || 'Live price',
+        tone: 'lime',
+      })))
+      setSearched(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to fetch live prices right now.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -35,9 +58,9 @@ export default function Home() {
             <p className="eyebrow"><span className="eyebrow-dot" /> India&apos;s grocery price checker</p>
             <h1>Shop smart.<br /><em>Save more.</em></h1>
             <p className="intro">Compare grocery prices across Blinkit, Zepto, Swiggy Instamart, BigBasket and JioMart — all in one simple search.</p>
-            <form className="search-form" onSubmit={submit}><Search size={20} aria-hidden="true" /><input value={query} onChange={(e) => { setQuery(e.target.value); setSearched(false) }} placeholder="What&apos;s on your shopping list?" aria-label="Search for an Indian grocery item" /><button type="submit">Find prices <ArrowRight size={17} /></button></form>
+            <form className="search-form" onSubmit={submit}><Search size={20} aria-hidden="true" /><input value={query} onChange={(e) => { setQuery(e.target.value); setSearched(false); setError('') }} placeholder="What&apos;s on your shopping list?" aria-label="Search for an Indian grocery item" /><button type="submit" disabled={loading}>{loading ? <><LoaderCircle size={17} className="spin" /> Checking live prices</> : <>Find live prices <ArrowRight size={17} /></>}</button></form>
             <div className="examples"><span>Try searching</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); setSearched(false) }}>{item}</button>)}</div>
-            {searched && <div className="results" aria-live="polite"><div className="result-heading"><strong>Best prices for {query}</strong><span>Updated just now</span></div>{deals.map((deal) => <div className="deal-row" key={deal.store}><span className={`store-dot ${deal.tone}`} /><b>{deal.store}</b><small>{deal.note}</small><strong>{deal.price}</strong></div>)}</div>}
+            {error && <p className="api-error" role="alert">{error}</p>}{searched && <div className="results" aria-live="polite"><div className="result-heading"><strong>Live prices for {query}</strong><span>Fetched just now</span></div>{liveDeals.length ? liveDeals.map((deal) => <div className="deal-row" key={`${deal.store}-${deal.price}`}><span className={`store-dot ${deal.tone}`} /><b>{deal.store}</b><small>{deal.note}</small><strong>{deal.price}</strong></div>) : <p className="empty-results">No live products were returned for this search.</p>}</div>}
           </div>
           <div className="hero-art" aria-label="Indian groceries and savings" role="img"><div className="art-note">Your thali<br /><span>for less.</span></div><div className="photo photo-avocado" /><div className="photo photo-tomato" /><div className="photo photo-bread" /><div className="price-sticker"><span>Save up to</span><strong>32%</strong><small>on your monthly shop</small></div></div>
         </section>
