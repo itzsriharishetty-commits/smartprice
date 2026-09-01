@@ -33,16 +33,19 @@ export default function Home() {
       const rows = Array.isArray(payload) ? payload : Array.isArray(groupedResults) ? groupedResults : Object.entries(groupedResults).flatMap(([store, products]) =>
         (Array.isArray(products) ? products : []).map((product) => ({ ...(product as object), store }))
       )
-      setLiveDeals(rows.slice(0, 12).map((row: { store?: string; retailer?: string; platform?: { name?: string } | string; price?: string | number; offer_price?: string | number; amount?: string | number; note?: string; quantity?: string; available?: boolean }) => {
+      const mappedDeals = rows.map((row: { id?: string; store?: string; retailer?: string; platform?: { name?: string } | string; price?: string | number; offer_price?: string | number; amount?: string | number; note?: string; quantity?: string; available?: boolean }) => {
         const store = typeof row.platform === 'object' ? row.platform?.name : row.store || row.retailer || row.platform || 'Quick commerce'
         const price = row.offer_price ?? row.price ?? row.amount
         return {
+          id: row.id || `${store}-${price}-${row.quantity}`,
           store,
           price: price == null ? '—' : `₹${price}`,
           note: `${row.quantity || 'Live price'}${row.available === false ? ' · Out of stock' : ''}`,
           tone: 'lime',
         }
-      }))
+      })
+      const uniqueStores = Array.from(new Map(mappedDeals.map((deal) => [deal.store, deal])).values())
+      setLiveDeals(uniqueStores.slice(0, 12))
       setSearched(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to fetch live prices right now.')
