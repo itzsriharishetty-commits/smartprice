@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'smartprice — Eat well. Spend less.',
-  description: 'Compare grocery prices and find the best deals on the food you love.',
+  title: 'smartprice India — Shop smart. Save more.',
+  description: 'Compare grocery prices across Blinkit, Zepto, BigBasket, Swiggy Instamart and JioMart in one simple search.',
   generator: 'v0.app',
   icons: {
     icon: [
