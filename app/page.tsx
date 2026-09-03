@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
-import { ArrowRight, LoaderCircle, Moon, Search, Sun } from 'lucide-react'
+import { ArrowRight, LoaderCircle, LocateFixed, MapPin, Moon, Search, Sun } from 'lucide-react'
 
 const examples = ['Atta 5kg', 'Basmati rice', 'Milk 1L', 'Maggi noodles']
 
@@ -18,6 +18,25 @@ export default function Home() {
   const [error, setError] = useState('')
   const [liveDeals, setLiveDeals] = useState<typeof deals>([])
   const [dark, setDark] = useState(false)
+  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null)
+  const [pincode, setPincode] = useState('560001')
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'detecting' | 'enabled' | 'denied'>('idle')
+
+  function detectLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatus('denied')
+      return
+    }
+    setLocationStatus('detecting')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({ lat: position.coords.latitude, lon: position.coords.longitude })
+        setLocationStatus('enabled')
+      },
+      () => setLocationStatus('denied'),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+    )
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -26,7 +45,12 @@ export default function Home() {
     setError('')
     setSearched(false)
     try {
-      const response = await fetch(`/api/prices?q=${encodeURIComponent(query.trim())}`)
+      const params = new URLSearchParams({ q: query.trim(), pincode })
+      if (location) {
+        params.set('lat', String(location.lat))
+        params.set('lon', String(location.lon))
+      }
+      const response = await fetch(`/api/prices?${params.toString()}`)
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || 'Could not load prices')
       const groupedResults = payload?.data?.results || payload?.results || {}
@@ -70,6 +94,12 @@ export default function Home() {
             <p className="intro">Compare grocery prices across Blinkit, Zepto, Swiggy Instamart, BigBasket and JioMart — all in one simple search.</p>
             <form className="search-form" onSubmit={submit}><Search size={20} aria-hidden="true" /><input value={query} onChange={(e) => { setQuery(e.target.value); setSearched(false); setError('') }} placeholder="What&apos;s on your shopping list?" aria-label="Search for an Indian grocery item" /><button type="submit" disabled={loading}>{loading ? <><LoaderCircle size={17} className="spin" /> Checking live prices</> : <>Find live prices <ArrowRight size={17} /></>}</button></form>
             <div className="examples"><span>Try searching</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); setSearched(false) }}>{item}</button>)}</div>
+            <div className="location-bar">
+              <div className="location-copy"><MapPin size={16} aria-hidden="true" /><span>{locationStatus === 'enabled' ? 'Using your current location' : 'Compare prices near you'}</span></div>
+              <button type="button" className="location-button" onClick={detectLocation} disabled={locationStatus === 'detecting'}><LocateFixed size={15} />{locationStatus === 'detecting' ? 'Detecting…' : locationStatus === 'enabled' ? 'Location enabled' : 'Use my location'}</button>
+              <label className="pincode-label">PIN <input value={pincode} onChange={(event) => setPincode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} aria-label="Delivery pincode" /></label>
+            </div>
+            {locationStatus === 'denied' && <p className="location-hint" role="status">Location access is unavailable. Enter your delivery PIN to get nearby prices.</p>}
             {error && <p className="api-error" role="alert">{error}</p>}{searched && <div className="results" aria-live="polite"><div className="result-heading"><strong>Live prices for {query}</strong><span>Fetched just now</span></div>{liveDeals.length ? liveDeals.map((deal) => <div className="deal-row" key={`${deal.store}-${deal.price}`}><span className={`store-dot ${deal.tone}`} /><b>{deal.store}</b><small>{deal.note}</small><strong>{deal.price}</strong></div>) : <p className="empty-results">No live products were returned for this search.</p>}</div>}
           </div>
           <div className="hero-art" aria-label="Indian groceries and savings" role="img"><div className="art-note">Your thali<br /><span>for less.</span></div><div className="photo photo-avocado" /><div className="photo photo-tomato" /><div className="photo photo-bread" /><div className="price-sticker"><span>Save up to</span><strong>32%</strong><small>on your monthly shop</small></div></div>
