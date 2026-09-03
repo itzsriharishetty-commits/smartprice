@@ -30,17 +30,10 @@ export async function GET(request: Request) {
   const apiKey = process.env.QUICKCOMMERCE_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'Price API is not configured.' }, { status: 500 })
 
-  const requestedLat = searchParams.get('lat')
-  const requestedLon = searchParams.get('lon')
-  const lat = requestedLat ? Number(requestedLat) : Number(DEFAULT_LOCATION.lat)
-  const lon = requestedLon ? Number(requestedLon) : Number(DEFAULT_LOCATION.lon)
-  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
-    return NextResponse.json({ error: 'Please provide a valid location.' }, { status: 400 })
-  }
   const location = {
-    lat: String(lat),
-    lon: String(lon),
-    pincode: searchParams.get('pincode')?.match(/^\\d{6}$/)?.[0] || DEFAULT_LOCATION.pincode,
+    lat: searchParams.get('lat') || DEFAULT_LOCATION.lat,
+    lon: searchParams.get('lon') || DEFAULT_LOCATION.lon,
+    pincode: searchParams.get('pincode') || DEFAULT_LOCATION.pincode,
   }
 
   const responses = await Promise.allSettled(PLATFORMS.map(async (platform) => {
